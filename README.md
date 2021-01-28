@@ -47,6 +47,10 @@ You can then start the OSD by pressing all 4 direction buttons at the same time 
 
 Only system programs written in assemler are supported.
 
+The Galaxy Invasion game running:
+
+![Galaxy Invasion](https://raw.githubusercontent.com/lawrie/lawrie.github.io/master/images/galaxy.jpg)
+
 The only way to run a Basic program is to to change convert a basic ,cas file to a hex file and use MEM_FILE_INIT in top.v to load the file into the game rom.
 
 You can run the Basic program in the game rom by typing "CLOAD" from Basic.
