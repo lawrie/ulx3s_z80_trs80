@@ -177,43 +177,6 @@ class osd:
         self.init_spi() # because of ecp5.prog() spi.deinit()
         self.spi_request.irq(trigger=Pin.IRQ_FALLING, handler=self.irq_handler_ref)
         self.irq_handler(0) # handle stuck IRQ
-      if filename.endswith(".nes") \
-      or filename.endswith(".col") \
-      or filename.endswith(".sg") \
-      or filename.endswith(".sms") \
-      or filename.endswith(".gg") \
-      or filename.endswith(".snes") \
-      or filename.endswith(".smc") \
-      or filename.endswith(".bin") \
-      or filename.endswith(".BIN") \
-      or filename.endswith(".sfc"):
-        import ld_nes
-        s=ld_nes.ld_nes(self.spi,self.cs)
-        s.ctrl(2)
-        s.load_stream(open(filename,"rb"))
-	s.ctrl(1)
-	s.ctrl(0)
-        del s
-        gc.collect()
-        self.enable[0]=0
-        self.osd_enable(0)
-      if filename.startswith("/sd/ti99_4a/") and filename.endswith(".bin"):
-        import ld_ti99_4a
-        s=ld_ti99_4a.ld_ti99_4a(self.spi,self.cs)
-        s.load_rom_auto(open(filename,"rb"),filename)
-        del s
-        gc.collect()
-        self.enable[0]=0
-        self.osd_enable(0)
-      if (filename.startswith("/sd/msx") and filename.endswith(".rom")) \
-      or filename.endswith(".mx1"):
-        import ld_msx
-        s=ld_msx.ld_msx(self.spi,self.cs)
-        s.load_msx_rom(open(filename,"rb"))
-        del s
-        gc.collect()
-        self.enable[0]=0
-        self.osd_enable(0)
       if filename.endswith(".z80"):
         self.enable[0]=0
         self.osd_enable(0)
@@ -222,6 +185,16 @@ class osd:
         s.loadz80(filename)
         del s
         gc.collect()
+      if filename.endswith(".nes"):
+        import ld_zxspectrum
+        s=ld_zxspectrum.ld_zxspectrum(self.spi,self.cs)
+        s.ctrl(1)
+        s.ctrl(0)
+        s.load_stream(open(filename,"rb"),addr=0,maxlen=0x101000)
+        del s
+        gc.collect()
+        self.enable[0]=0
+        self.osd_enable(0)
       if filename.endswith(".ora") or filename.endswith(".orao"):
         self.enable[0]=0
         self.osd_enable(0)
@@ -373,11 +346,7 @@ class osd:
   #    self.spi.write(bytearray(a)) # write content
   #    self.cs.off()
 
-bitstream="/sd/sms/bitstreams/ulx3s_85f_sms.bit"
-try:
-  os.mount(SDCard(slot=3),"/sd")
-  ecp5.prog(bitstream)
-except:
-  print(bitstream+" file not found")
+os.mount(SDCard(slot=3),"/sd")
+#ecp5.prog("/sd/trs80/bitstreams/ulx3s_trs80_12f.bit")
 gc.collect()
-run=osd()
+trs80=osd()

@@ -1,12 +1,12 @@
 `default_nettype none
 module top #(
   parameter c_vga_out      = 0,  // 0; Just HDMI, 1: VGA and HDMI
-  parameter c_acia_serial  = 1,  // 0: disabled, 1: ACIA serial
-  parameter c_esp32_serial = 0,  // 0: disabled, 1: ESP32 serial (micropython console)
-  parameter c_sdram        = 1,  // SDRAM or BRAM 
-  parameter c_keyboard     = 0,  // Include keyboard support
+  parameter c_acia_serial  = 0,  // 0: disabled, 1: ACIA serial
+  parameter c_esp32_serial = 1,  // 0: disabled, 1: ESP32 serial (micropython console)
+  parameter c_sdram        = 0,  // SDRAM or BRAM 
+  parameter c_keyboard     = 1,  // Include keyboard support
   parameter c_diag         = 1,  // 0: No led diagnostcs, 1: led diagnostics 
-  parameter c_speed        = 1,  // CPU speed = 25 / 2 ** (c_speed + 1) MHz
+  parameter c_speed        = 3,  // CPU speed = 25 / 2 ** (c_speed + 1) MHz
   parameter c_reset        = 15, // Bits (minus 1) in power-up reset counter
   parameter c_lcd_hex      = 1   // SPI LCD HEX decoder
 ) (
@@ -63,7 +63,7 @@ module top #(
   // ===============================================================
   wire          n_wr;
   wire          n_rd;
-  wire          n_int;
+  wire          n_int = 1'b0;
   wire          n_mreq;
   wire          n_iorq;
   wire          n_m1;
@@ -84,6 +84,10 @@ module top #(
   wire          n_rom_cs;
   wire          n_ram_cs;
   
+  wire          n_kbd_cs;
+  wire          n_cass_cs;
+  wire          n_game_cs;
+
   wire          tdata_cs;
   wire          tctrl_cs;
 
@@ -92,6 +96,13 @@ module top #(
   reg [6:0]     r_btn_joy;
   reg [7:0]     r_cpu_control;
   wire          spi_load = r_cpu_control[1];
+  reg [3:0]     sound;
+  wire [7:0]    key_data;
+  reg [7:0]     r_game_out;
+  reg [13:0]    game_addr = 0;
+  reg [2:0]     tape_bits;
+  reg           r_n_iord;
+  wire [7:0]    game_out;
   
   // ===============================================================
   // System Clock generation
@@ -114,7 +125,7 @@ module top #(
   );
   wire clk_hdmi  = clocks[0];
   wire clk_vga   = clocks[1];
-  wire clk_cpu  = clocks[1];
+  wire clk_cpu  =  clocks[1];
   wire clk_sdram = clocks[2];
   wire sdram_clk = clocks[3]; // phase shifted for chip
 
@@ -147,13 +158,42 @@ module top #(
   // ===============================================================
   assign n_rom_cs = 1'b1;
   assign n_ram_cs = 1'b0;
+
+  assign n_kbd_cs  = !(cpu_address[15:8] == 8'h38);
+  assign n_cass_cs = !(cpu_address[7:0]  == 8'hFF);
+  assign n_game_cs = !(cpu_address[7:0]  == 8'h04);
+
   assign tctrl_cs = cpu_address[7:0] == 8'h80 && n_iorq == 1'b0;
   assign tdata_cs = cpu_address[7:0] == 8'h81 && n_iorq == 1'b0;
 
   // ===============================================================
-  // Memory decoding
+  // Memory decoding and I/0 ports
   // ===============================================================
-  assign cpu_data_in = (tdata_cs || tctrl_cs) && n_iord == 1'b0 ? acia_dout :  ram_out;
+  assign cpu_data_in =  n_game_cs == 1'b0 && n_iord == 1'b0 ? r_game_out :
+                        n_kbd_cs == 1'b0 && n_memrd == 1'b0 ? key_data :
+                                                              ram_out;
+
+  always @(posedge clk_cpu) begin
+    if (cpu_clk_enable) begin
+      // OUT 4
+      if (n_game_cs == 1'b0 && n_iowr == 1'b0) game_addr <= 0;
+
+      // Cassette out
+      if (n_cass_cs == 1'b0 && n_iowr == 1'b0) begin
+        if (cpu_data_out[2] && !tape_bits[2]) begin // Motor on
+          game_addr <= 0;
+        end
+        tape_bits <= cpu_data_out[2:0];
+      end
+
+      // IN 4
+      r_n_iord <= n_iord;
+      if (n_game_cs == 1'b0 && n_iord == 1'b0 && r_n_iord == 1'b1) begin
+        r_game_out <= game_out;
+        game_addr <= game_addr + 1;
+      end
+    end
+  end
 
   // ===============================================================
   // CPU
@@ -193,10 +233,20 @@ module top #(
     if (c_keyboard) begin
       // Get PS/2 keyboard events
       ps2 ps2_kbd (
-       .clk(clk_cpu),
-       .ps2_clk(usb_fpga_bd_dp),
-       .ps2_data(usb_fpga_bd_dn),
-       .ps2_key(ps2_key)
+        .clk(clk_cpu),
+        .ps2_clk(usb_fpga_bd_dp),
+        .ps2_data(usb_fpga_bd_dn),
+        .ps2_key(ps2_key)
+      );
+
+      // Keyboard matrix
+      keyboard the_keyboard (
+        .reset(~n_reset),
+        .clk_sys(clk_cpu),
+        .ps2_key(ps2_key),
+        .addr(cpu_address[7:0]),
+        .key_data(key_data),
+        .kblayout(1'b1)
       );
     end
   endgenerate
@@ -242,22 +292,22 @@ module top #(
   // RAM
   // ===============================================================
   wire [7:0]  vid_out;
-  wire [12:0] vga_addr;
+  wire [9:0] vga_addr;
 
   generate
     if (c_sdram == 0) begin
       dpram #( 
-        .MEM_INIT_FILE("../roms/boot.mem"),
+        .MEM_INIT_FILE("../roms/trs80.mem"),
         .DATA_WIDTH(8),
         .DEPTH(64 * 1024)
       ) ram64 (
         .clk_a(clk_cpu),
-        .we_a(spi_load ? spi_ram_wr && spi_ram_addr[31:24] == 8'h00 : n_ram_cs == 1'b0 && n_memwr == 1'b0),
+        .we_a(spi_load ? spi_ram_wr && spi_ram_addr[31:24] == 8'h00 : n_memwr == 1'b0 && cpu_address >= 16'h3000),
         .addr_a(spi_load ? spi_ram_addr[15:0] : cpu_address),
         .din_a(spi_load ? spi_ram_di : cpu_data_out),
         .dout_a(ram_out),
         .clk_b(clk_vga),
-        .addr_b({3'b010, vga_addr}),
+        .addr_b(16'h3c00 + {6'b0, vga_addr}),
         .dout_b(vid_out)
       );
     end else begin
@@ -300,6 +350,18 @@ module top #(
   endgenerate
 
   // ===============================================================
+  // ROM
+  // ===============================================================
+  rom #(
+    .MEM_INIT_FILE("../roms/dslogo.mem"),
+    .DEPTH(16 * 1024)
+  ) game_rom (
+    .clk(clk_cpu),
+    .addr(game_addr),
+    .dout(game_out)
+  );
+
+  // ===============================================================
   // Video
   // ===============================================================
   wire   [7:0]  red;
@@ -331,8 +393,7 @@ module top #(
     .vga_hs(hsync),
     .vga_vs(vsync),
     .vga_addr(vga_addr),
-    .vga_data(vid_out),
-    .n_int(n_int)
+    .vga_data(vid_out)
   );
 
   // ===============================================================
@@ -377,7 +438,18 @@ module top #(
   // ===============================================================
   // Audio
   // ===============================================================
-  assign audio_l = 0;
+  always @(posedge clk_cpu) begin
+    if (n_iowr == 1'b0 && n_cass_cs == 1'b0) begin
+      case (cpu_data_out[1:0])
+        2'b00: sound <= 4'b0100;
+        2'b01: sound <= 4'b1000;
+        2'b10: sound <= 4'b0000;
+        2'b11: sound <= 4'b0100;
+      endcase
+    end
+  end
+
+  assign audio_l = sound;
   assign audio_r = audio_l;
 
   // ===============================================================
