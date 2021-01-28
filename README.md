@@ -59,9 +59,3 @@ The dslogo.cas Basic program running, showing the famous Australian, Dick Smith:
 
 ![Dick Smith](https://raw.githubusercontent.com/lawrie/lawrie.github.io/master/images/dslogo.jpg)
 
-## Bugs
-
-The CPU speed is not correct.
-
-The shift and backspace keys are not working correctly.
-
