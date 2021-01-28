@@ -308,7 +308,7 @@ always @(posedge clk_sys) begin
 	input_strobe <= 0;
 
 	if(ps2_key[10]) begin
-		press_btn <= ~ps2_key[9];
+		press_btn <= ps2_key[9];
 		code <= ps2_key[7:0];
 		input_strobe <= 1;
 	end

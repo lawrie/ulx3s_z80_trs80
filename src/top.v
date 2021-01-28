@@ -36,16 +36,16 @@ module top #(
   inout  sd_clk, sd_cmd,
   inout   [3:0] sd_d,
 
-  output sdram_csn,       // chip select
-  output sdram_clk,       // clock to SDRAM
-  output sdram_cke,       // clock enable to SDRAM
-  output sdram_rasn,      // SDRAM RAS
-  output sdram_casn,      // SDRAM CAS
-  output sdram_wen,       // SDRAM write-enable
-  output [12:0] sdram_a,  // SDRAM address bus
-  output  [1:0] sdram_ba, // SDRAM bank-address
-  output  [1:0] sdram_dqm,// byte select
-  inout  [15:0] sdram_d,  // data bus to/from SDRAM
+  //output sdram_csn,       // chip select
+  //output sdram_clk,       // clock to SDRAM
+  //output sdram_cke,       // clock enable to SDRAM
+  //output sdram_rasn,      // SDRAM RAS
+  //output sdram_casn,      // SDRAM CAS
+  //output sdram_wen,       // SDRAM write-enable
+  //output [12:0] sdram_a,  // SDRAM address bus
+  //output  [1:0] sdram_ba, // SDRAM bank-address
+  //output  [1:0] sdram_dqm,// byte select
+  //inout  [15:0] sdram_d,  // data bus to/from SDRAM
 
   inout  [27:0] gp,gn,
   // SPI display
@@ -114,8 +114,8 @@ module top #(
       .in_hz( 25*1000000),
     .out0_hz(125*1000000),
     .out1_hz( 25*1000000),
-    .out2_hz(100*1000000),                // SDRAM core
-    .out3_hz(100*1000000), .out3_deg(180) // SDRAM chip 45-330:ok 0-30:not
+    .out2_hz( 28*1000000),
+    .out2_tol_hz(1000000)
   )
   ecp5pll_inst
   (
@@ -125,7 +125,7 @@ module top #(
   );
   wire clk_hdmi  = clocks[0];
   wire clk_vga   = clocks[1];
-  wire clk_cpu  =  clocks[1];
+  wire clk_cpu  =  clocks[2];
   wire clk_sdram = clocks[2];
   wire sdram_clk = clocks[3]; // phase shifted for chip
 
@@ -241,7 +241,7 @@ module top #(
 
       // Keyboard matrix
       keyboard the_keyboard (
-        .reset(~n_reset),
+        .reset(reset),
         .clk_sys(clk_cpu),
         .ps2_key(ps2_key),
         .addr(cpu_address[7:0]),
