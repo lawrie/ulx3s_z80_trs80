@@ -51,6 +51,10 @@ The only way to run a Basic program is to to change convert a basic ,cas file to
 
 You can run the Basic program in the game rom by typing "CLOAD" from Basic.
 
+The dslogo.cas Basic program running, showing the famous Australian, Dick Smith:
+
+![Dick Smith](https://raw.githubusercontent.com/lawrie/lawrie.github.io/master/images/dslogo.jpg)
+
 ## Bugs
 
 The CPU speed is not correct.
