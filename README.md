@@ -2,7 +2,7 @@
 
 This version has been created from the ulxs3_z80_template code base.
 
-##Introduction
+## Introduction
 
 This is a reimplementsation of ulx3s_trs_80 using the ulx3s_z80_template, so that it shares a common up-to-date code base with my other Z80 computers.
 
