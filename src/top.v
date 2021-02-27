@@ -518,7 +518,7 @@ module top #(
   reg [127:0] r_display;
   // HEX decoder does printf("%16X\n%16X\n", r_display[63:0], r_display[127:64]);
   always @(posedge clk_cpu)
-    r_display = {cpu_data_in, cpu_data_out, cpu_address, pc};
+    r_display <= {cpu_data_in, cpu_data_out, cpu_address, pc};
 
   parameter c_color_bits = 16;
   wire [7:0] x;
